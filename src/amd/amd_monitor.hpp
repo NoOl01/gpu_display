@@ -7,7 +7,6 @@
 
 
 #include "../monitor.hpp"
-#include "../gpu_monitor.hpp"
 
 #define WIN32_LEAN_AND_MEAN
 

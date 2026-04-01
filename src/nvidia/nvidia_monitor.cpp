@@ -1,8 +1,5 @@
 #include "nvidia_monitor.hpp"
 
-#define NVML_STRUCT_VERSION(type, version) (unsigned int)(sizeof(nvml##type##_v##version##_t) | (version << 24))
-#define nvmlTemperature_v1 NVML_STRUCT_VERSION(Temperature, 1)
-
 
 enum class nvmlReturn_t
 {
@@ -55,7 +52,6 @@ static NVML_SHUTDOWN nvmlShutdown{nullptr};
 // Enum
 static NVML_DEVICE_GET_HANDLE_BY_INDEX_V2 nvmlDeviceGetHandleByIndex_v2{nullptr};
 
-
 // Sensors
 static NVML_DEVICE_GET_TEMPERATURE nvmlDeviceGetTemperature{nullptr}; 
 static NVML_DEVICE_GET_UTILIZATION_RATES nvmlDeviceGetUtilizationRates{nullptr};
@@ -106,13 +102,13 @@ static NVML_DEVICE_GET_UTILIZATION_RATES nvmlDeviceGetUtilizationRates{nullptr};
 
     if((CurrentCallResult = nvmlDeviceGetHandleByIndex_v2((std::uint32_t)0, &CurrentDevice)) != nvmlReturn_t::NVML_SUCCESS)
     {
+        // Definitely a stub. There's no predictable order of indexing in NVML
+        // so it's better to replace indexes to UUID or PCI/BUS ids.
         switch(CurrentCallResult)
         {
             case nvmlReturn_t::NVML_ERROR_INVALID_ARGUMENT:
                 if((CurrentCallResult = nvmlDeviceGetHandleByIndex_v2((std::uint32_t)1, &CurrentDevice)) != nvmlReturn_t::NVML_SUCCESS)
                     return data;
-                break;
-            default:
                 break;
         }
     }

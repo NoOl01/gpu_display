@@ -48,6 +48,7 @@ static void * __stdcall ADL_Main_Memory_Alloc(int size) {
     return malloc(size);
 }
 
+
 [[nodiscard]] bool AMDMonitor::Init() {
     m_hDLL = LoadLibraryA("atiadlxx.dll");
     if (!m_hDLL) m_hDLL = LoadLibraryA("atiadlxy.dll");
