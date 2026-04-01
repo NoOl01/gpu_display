@@ -1,0 +1,3 @@
+F:/gpu_display/build/CMakeFiles/gpu_display.dir
+F:/gpu_display/build/CMakeFiles/edit_cache.dir
+F:/gpu_display/build/CMakeFiles/rebuild_cache.dir

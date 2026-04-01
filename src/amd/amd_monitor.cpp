@@ -1,62 +1,54 @@
 #include "amd_monitor.hpp"
 
-#include <iostream>
-#include <windows.h>
+
 #include "../../lib/adl/include/adl_sdk.h"
 #include "../../lib/adl/include/adl_defines.h"
 #include "../../lib/adl/include/adl_structures.h"
 
-typedef void *(__stdcall *ADL_MAIN_MALLOC_CALLBACK)(int);
 
-typedef int (*ADL2_MAIN_CONTROL_CREATE)(ADL_MAIN_MALLOC_CALLBACK, int, void **);
-
-typedef int (*ADL2_MAIN_CONTROL_DESTROY)(void *);
-
-typedef int (*ADL2_ADAPTER_NUMBEROFADAPTERS_GET)(void *, int *);
-
-typedef int (*ADL2_ADAPTER_ADAPTERINFO_GET)(void *, AdapterInfo *, int);
-
-typedef int (*ADL2_OVERDRIVE_CAPS)(void *, int, int *, int *, int *);
+using ADL_MAIN_MALLOC_CALLBACK          = void * (__stdcall *)(int iSize);
+using ADL2_MAIN_CONTROL_CREATE          = int(*)(ADL_MAIN_MALLOC_CALLBACK callback, int iEnumConnectedAdapters, void ** context);
+using ADL2_MAIN_CONTROL_DESTROY         = int(*)(void * context);
+using ADL2_ADAPTER_NUMBEROFADAPTERS_GET = int(*)(void * context, int * lpNumAdapters);
+using ADL2_ADAPTER_ADAPTERINFO_GET      = int(*)(void * context, AdapterInfo * lpInfo, int iInputSize);
+using ADL2_OVERDRIVE_CAPS               = int(*)(void * context, int iAdapterIndex, int * lpSupported, int * lpEnabled, int * lpVersion);
 
 // OD6
-typedef int (*ADL2_OVERDRIVE6_TEMPERATURE_GET)(void *, int, int *);
-
-typedef int (*ADL2_OVERDRIVE6_CURRENTSTATUS_GET)(void *, int, ADLOD6CurrentStatus *);
+using ADL2_OVERDRIVE6_TEMPERATURE_GET   = int(*)(void * context, int iAdapterIndex, int * lpTemperature);
+using ADL2_OVERDRIVE6_CURRENTSTATUS_GET = int(*)(void * context, int iAdapterIndex, ADLOD6CurrentStatus * lpCurrentStatus);
 
 // ODN (7)
-typedef int (*ADL2_OVERDRIVEN_TEMPERATURE_GET)(void *, int, int, int *);
-
-typedef int (*ADL2_OVERDRIVEN_PERFORMANCESTATUS_GET)(void *, int, ADLODNPerformanceStatus *);
+using ADL2_OVERDRIVEN_TEMPERATURE_GET       = int(*)(void * context, int iAdapterIndex, int iTemperatureSource, int * lpTemperature);
+using ADL2_OVERDRIVEN_PERFORMANCESTATUS_GET = int(*)(void * context, int iAdapterIndex, ADLODNPerformanceStatus * lpPerformanceStatus);
 
 // OD8
-typedef int (*ADL2_NEW_QUERYPMLOGDATA_GET)(void *, int, ADLPMLogData *);
+using ADL2_NEW_QUERYPMLOGDATA_GET         = int(*)(void * context, int iAdapterIndex, ADLPMLogData * lpDataOutput);
+using ADL2_OVERDRIVE8_CURRENT_SETTING_GET = int(*)(void * context, int iAdapterIndex, ADLOD8CurrentSetting * lpCurrentSetting);
 
-typedef int (*ADL2_OVERDRIVE8_CURRENT_SETTING_GET)(void *, int, ADLOD8CurrentSetting *);
 
-
-static ADL2_MAIN_CONTROL_CREATE ADL2_Main_Control_Create = nullptr;
-static ADL2_MAIN_CONTROL_DESTROY ADL2_Main_Control_Destroy = nullptr;
-static ADL2_ADAPTER_NUMBEROFADAPTERS_GET ADL2_Adapter_NumberOfAdapters_Get = nullptr;
-static ADL2_ADAPTER_ADAPTERINFO_GET ADL2_Adapter_AdapterInfo_Get = nullptr;
-static ADL2_OVERDRIVE_CAPS ADL2_Overdrive_Caps = nullptr;
+static ADL2_MAIN_CONTROL_CREATE ADL2_Main_Control_Create{nullptr};
+static ADL2_MAIN_CONTROL_DESTROY ADL2_Main_Control_Destroy{nullptr};
+static ADL2_ADAPTER_NUMBEROFADAPTERS_GET ADL2_Adapter_NumberOfAdapters_Get{nullptr};
+static ADL2_ADAPTER_ADAPTERINFO_GET ADL2_Adapter_AdapterInfo_Get{nullptr};
+static ADL2_OVERDRIVE_CAPS ADL2_Overdrive_Caps{nullptr};
 
 // OD6
-static ADL2_OVERDRIVE6_TEMPERATURE_GET ADL2_Overdrive6_Temperature_Get = nullptr;
-static ADL2_OVERDRIVE6_CURRENTSTATUS_GET ADL2_Overdrive6_CurrentStatus_Get = nullptr;
+static ADL2_OVERDRIVE6_TEMPERATURE_GET ADL2_Overdrive6_Temperature_Get{nullptr};
+static ADL2_OVERDRIVE6_CURRENTSTATUS_GET ADL2_Overdrive6_CurrentStatus_Get{nullptr};
 
 // ODN (7)
-static ADL2_OVERDRIVEN_TEMPERATURE_GET ADL2_OverdriveN_Temperature_Get = nullptr;
-static ADL2_OVERDRIVEN_PERFORMANCESTATUS_GET ADL2_OverdriveN_PerformanceStatus_Get = nullptr;
+static ADL2_OVERDRIVEN_TEMPERATURE_GET ADL2_OverdriveN_Temperature_Get{nullptr};
+static ADL2_OVERDRIVEN_PERFORMANCESTATUS_GET ADL2_OverdriveN_PerformanceStatus_Get{nullptr};
 
 // OD8
-static ADL2_NEW_QUERYPMLOGDATA_GET ADL2_New_QueryPMLogData_Get = nullptr;
-static ADL2_OVERDRIVE8_CURRENT_SETTING_GET ADL2_Overdrive8_Current_Setting_Get = nullptr;
+static ADL2_NEW_QUERYPMLOGDATA_GET ADL2_New_QueryPMLogData_Get{nullptr};
+static ADL2_OVERDRIVE8_CURRENT_SETTING_GET ADL2_Overdrive8_Current_Setting_Get{nullptr};
 
-static void *__stdcall ADL_Main_Memory_Alloc(int size) {
+static void __stdcall * ADL_Main_Memory_Alloc(int size) {
     return malloc(size);
 }
 
-bool AMDMonitor::Init() {
+[[nodiscard]] bool AMDMonitor::Init() {
     m_hDLL = LoadLibraryA("atiadlxx.dll");
     if (!m_hDLL) m_hDLL = LoadLibraryA("atiadlxy.dll");
     if (!m_hDLL) return false;
@@ -113,10 +105,12 @@ bool AMDMonitor::Init() {
         ADL2_Overdrive_Caps(m_context, m_adapterIndex, &supported, &enabled, &m_odVersion);
     }
 
+    IsInitialized = true;
     return m_adapterIndex != -1;
 }
 
-GPUData AMDMonitor::Query() {
+
+[[nodiscard]] GPUData AMDMonitor::Query() {
     GPUData data = {0, 0};
 
     switch (m_odVersion) {
@@ -163,6 +157,7 @@ GPUData AMDMonitor::Query() {
 
     return data;
 }
+
 
 void AMDMonitor::Shutdown() {
     if (ADL2_Main_Control_Destroy && m_context) {

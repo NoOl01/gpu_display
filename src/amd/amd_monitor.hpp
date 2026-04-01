@@ -1,18 +1,31 @@
 #pragma once
+
+#include <iostream>
+
+
 #include <windows.h>
+
 
 #include "../monitor.hpp"
 #include "../gpu_monitor.hpp"
 
+#define WIN32_LEAN_AND_MEAN
+
+
 class AMDMonitor : public IGPUMonitor {
     public:
-    bool Init() override;
-    GPUData Query() override;
-    void Shutdown() override;
+        ~AMDMonitor()
+        {
+            if(IsInitialized) Shutdown();
+        }
+        [[nodiscard]] bool Init() override;
+        [[nodiscard]] GPUData Query() override;
+        void Shutdown() override;
 
     private:
-    HMODULE m_hDLL = nullptr;
-    void* m_context = nullptr;
-    int m_adapterIndex = -1;
-    int m_odVersion = 0;
+        HMODULE m_hDLL = nullptr;
+        void* m_context = nullptr;
+        int m_adapterIndex = -1;
+        int m_odVersion = 0;
+        bool IsInitialized{false};
 };
