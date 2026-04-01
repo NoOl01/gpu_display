@@ -44,7 +44,7 @@ static ADL2_OVERDRIVEN_PERFORMANCESTATUS_GET ADL2_OverdriveN_PerformanceStatus_G
 static ADL2_NEW_QUERYPMLOGDATA_GET ADL2_New_QueryPMLogData_Get{nullptr};
 static ADL2_OVERDRIVE8_CURRENT_SETTING_GET ADL2_Overdrive8_Current_Setting_Get{nullptr};
 
-static void __stdcall * ADL_Main_Memory_Alloc(int size) {
+static void * __stdcall ADL_Main_Memory_Alloc(int size) {
     return malloc(size);
 }
 

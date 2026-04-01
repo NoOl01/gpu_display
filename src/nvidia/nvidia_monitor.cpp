@@ -9,6 +9,7 @@ enum class nvmlReturn_t
     NVML_SUCCESS = 0,
     NVML_ERROR_UNINITIALIZED = 1,
     NVML_ERROR_INVALID_ARGUMENT = 2,
+    NVML_ERROR_NOT_SUPPORTED = 3,
     NVML_ERROR_NO_PERMISSION = 4,
     NVML_ERROR_INSUFFICIENT_POWER = 8,
     NVML_ERROR_DRIVER_NOT_LOADED = 9,
@@ -43,8 +44,8 @@ using nvmlUtilization_t = struct {
 using NVML_INIT_V2  = nvmlReturn_t(*)(void);
 using NVML_SHUTDOWN = nvmlReturn_t(*)(void);
 using NVML_DEVICE_GET_HANDLE_BY_INDEX_V2 = nvmlReturn_t(*)(std::uint32_t index, nvmlDevice_t * device);
-using NVML_DEVICE_GET_TEMPERATURE_V      = nvmlReturn_t(*)(nvmlDevice_t * device, nvmlTemperature_v1_t * temperature);
-using NVML_DEVICE_GET_UTILIZATION_RATES  = nvmlReturn_t(*)(nvmlDevice_t * device, nvmlUtilization_t * utilization);
+using NVML_DEVICE_GET_TEMPERATURE        = nvmlReturn_t(*)(nvmlDevice_t device, nvmlTemperatureSensors_t sensorType, std::uint32_t * temperature);
+using NVML_DEVICE_GET_UTILIZATION_RATES  = nvmlReturn_t(*)(nvmlDevice_t device, nvmlUtilization_t * utilization);
 
 
 // Init
@@ -54,14 +55,15 @@ static NVML_SHUTDOWN nvmlShutdown{nullptr};
 // Enum
 static NVML_DEVICE_GET_HANDLE_BY_INDEX_V2 nvmlDeviceGetHandleByIndex_v2{nullptr};
 
+
 // Sensors
-static NVML_DEVICE_GET_TEMPERATURE_V nvmlDeviceGetTemperatureV{nullptr}; 
+static NVML_DEVICE_GET_TEMPERATURE nvmlDeviceGetTemperature{nullptr}; 
 static NVML_DEVICE_GET_UTILIZATION_RATES nvmlDeviceGetUtilizationRates{nullptr};
 
 
 
 [[nodiscard]] bool NVIDIAMonitor::Init() {
-    m_hDLL = LoadLibraryExA("nvml.dll", NULL, LOAD_LIBRARY_REQUIRE_SIGNED_TARGET);
+    m_hDLL = LoadLibraryA("nvml.dll");
     if(!m_hDLL) return false;
 
     // Init
@@ -75,8 +77,8 @@ static NVML_DEVICE_GET_UTILIZATION_RATES nvmlDeviceGetUtilizationRates{nullptr};
         GetProcAddress(m_hDLL, "nvmlDeviceGetHandleByIndex_v2"));
 
     // Sensors
-    nvmlDeviceGetTemperatureV = reinterpret_cast<NVML_DEVICE_GET_TEMPERATURE_V>(
-        GetProcAddress(m_hDLL, "nvmlDeviceGetTemperatureV"));
+    nvmlDeviceGetTemperature = reinterpret_cast<NVML_DEVICE_GET_TEMPERATURE>(
+        GetProcAddress(m_hDLL, "nvmlDeviceGetTemperature"));
     nvmlDeviceGetUtilizationRates = reinterpret_cast<NVML_DEVICE_GET_UTILIZATION_RATES>(
         GetProcAddress(m_hDLL, "nvmlDeviceGetUtilizationRates"));
 
@@ -91,14 +93,10 @@ static NVML_DEVICE_GET_UTILIZATION_RATES nvmlDeviceGetUtilizationRates{nullptr};
 
 [[nodiscard]] GPUData NVIDIAMonitor::Query() {
     GPUData data = {0, 0};
-    nvmlDevice_t* CurrentDevice;
+    nvmlDevice_t CurrentDevice;
     nvmlReturn_t CurrentCallResult;
 
-    nvmlTemperature_v1_t CurrentTemperature{
-        .version = nvmlTemperature_v1,
-        .sensorType = nvmlTemperatureSensors_t::NVML_TEMPERATURE_GPU,
-        .temperature = 0
-    };
+    std::uint32_t CurrentTemperature;
 
     nvmlUtilization_t CurrentUtilization{
         .gpu = 0,
@@ -106,19 +104,23 @@ static NVML_DEVICE_GET_UTILIZATION_RATES nvmlDeviceGetUtilizationRates{nullptr};
     };
 
 
-    if((CurrentCallResult = nvmlDeviceGetHandleByIndex_v2((std::uint32_t)0, CurrentDevice)) != nvmlReturn_t::NVML_SUCCESS)
+    if((CurrentCallResult = nvmlDeviceGetHandleByIndex_v2((std::uint32_t)0, &CurrentDevice)) != nvmlReturn_t::NVML_SUCCESS)
     {
         switch(CurrentCallResult)
         {
             case nvmlReturn_t::NVML_ERROR_INVALID_ARGUMENT:
-                if((CurrentCallResult = nvmlDeviceGetHandleByIndex_v2((std::uint32_t)1, CurrentDevice)) != nvmlReturn_t::NVML_SUCCESS)
+                if((CurrentCallResult = nvmlDeviceGetHandleByIndex_v2((std::uint32_t)1, &CurrentDevice)) != nvmlReturn_t::NVML_SUCCESS)
                     return data;
+                break;
+            default:
                 break;
         }
     }
 
-    if((CurrentCallResult = nvmlDeviceGetTemperatureV(CurrentDevice, &CurrentTemperature)) != nvmlReturn_t::NVML_SUCCESS)
-        CurrentTemperature.temperature = 0;
+    if((CurrentCallResult = nvmlDeviceGetTemperature(CurrentDevice, nvmlTemperatureSensors_t::NVML_TEMPERATURE_GPU, &CurrentTemperature)) != nvmlReturn_t::NVML_SUCCESS)
+    {
+        CurrentTemperature = 0;
+    }
 
 
     if((CurrentCallResult = nvmlDeviceGetUtilizationRates(CurrentDevice, &CurrentUtilization)) != nvmlReturn_t::NVML_SUCCESS)
@@ -126,6 +128,9 @@ static NVML_DEVICE_GET_UTILIZATION_RATES nvmlDeviceGetUtilizationRates{nullptr};
         CurrentUtilization.gpu = 0;
         CurrentUtilization.memory = 0;
     }
+
+    data.temperature = static_cast<float>(CurrentTemperature);
+    data.load = static_cast<float>(CurrentUtilization.gpu);
 
     return data;
 }
